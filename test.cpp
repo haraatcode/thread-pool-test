@@ -7,13 +7,26 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
-#include <functional>
+
 
 
 using namespace std;
 
 
 class Result {
+	int result;
+
+public :
+	Result(int result) {
+		this->result = result;
+	}
+	void setIntResult(int result) {
+		this->result = result;
+	}
+
+	int getIntResult() {
+		return this->result;
+	}
 };
 
 class ThreadPoolExecutor {
@@ -31,6 +44,7 @@ class ThreadPoolExecutor {
 			packaged_task<Result()> task;
 			{
 				unique_lock<mutex> lock(mxQueue);
+				cout << "waiting " << this_thread::get_id() << endl;
 				cvQueue.wait(lock, [&]() { return !taskQueue.empty(); });
 				cout << "task is executing " << this_thread::get_id() << endl;
 
@@ -38,8 +52,9 @@ class ThreadPoolExecutor {
 				task = move(taskQueue.front());
 				taskQueue.pop();
 			}
-			//execute the task
+
 			task();
+
 			cout << "execution finished " << this_thread::get_id() << endl;
 		}
 	}
@@ -62,12 +77,18 @@ public:
 	}
 
 
-	void submitTask(function<Result()> fnc) {
+	future<Result> submitTask(function<Result()> fnc) {
+
+		future<Result> taskFuture;
+
 		packaged_task<Result()> task(fnc);
+		taskFuture = task.get_future();
 
 		unique_lock<mutex> lock(mxQueue);
 		taskQueue.push(move(task));
+		cout << "task is submitted" << endl << endl;
 		cvQueue.notify_one(); //notify next waiting thread to be executed 
+		return taskFuture;
 	}
 
 	void deferShutDown() {
@@ -83,21 +104,45 @@ public:
 
 Result testFunction() {
 	cout << "=====counting started======" << endl;
-	for (int i = 0; i < 1000000000; i++) {
-		int j = i * 1 / 1.9 + 2;
-		if ((i % 50000000) == 0)  cout << ".";
+	//generate a  random number
+	default_random_engine en;
+
+	uniform_int_distribution<int> dist(1000000000 / 2, 1000000000);
+
+	int upperLimit = dist(en);
+	int j = 0;
+	for (int i = 0; i < upperLimit; i++) {
+		j = i * 1 / 1.9 + 2;
+		if ((i % upperLimit / 10) == 0)  cout << ".";
 	}
 
+	//throw 42;
+
 	cout << endl;
-	return  Result();
+	Result result = { j };
+
+	return  result;
 }
 
 
 int main() {
-	unique_ptr<ThreadPoolExecutor> executor = make_unique<ThreadPoolExecutor>(0);
+	unique_ptr<ThreadPoolExecutor> executor = make_unique<ThreadPoolExecutor>(1);
+	vector<future<Result>> futures;
 
-	for (int i = 0; i < 10; i++)
-		executor->submitTask(testFunction);
+	for (int i = 0; i < 10; i++) {
+		future<Result> future = executor->submitTask(testFunction);
+		futures.push_back(move(future));
+	}
+
+	try {
+		int result = futures[0].get().getIntResult();
+		cout << "the result is " << result << endl;
+	}
+	catch (...) {
+		cout << "error" << endl;
+	}
+
+
 
 	executor->deferShutDown();
-}
+} 
