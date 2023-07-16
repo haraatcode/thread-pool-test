@@ -29,7 +29,6 @@ class ThreadPoolExecutor {
 		//check the queue and pick up a task to be executed
 		while (!shouldExit) {
 			packaged_task<Result()> task;
-
 			{
 				unique_lock<mutex> lock(mxQueue);
 				cvQueue.wait(lock, [&]() { return !taskQueue.empty(); });
@@ -38,7 +37,6 @@ class ThreadPoolExecutor {
 				//pick the item from the queue
 				task = move(taskQueue.front());
 				taskQueue.pop();
-
 			}
 			//execute the task
 			task();
@@ -85,7 +83,7 @@ public:
 
 Result testFunction() {
 	cout << "=====counting started======" << endl;
- 	for (int i = 0; i < 1000000000; i++) {
+	for (int i = 0; i < 1000000000; i++) {
 		int j = i * 1 / 1.9 + 2;
 		if ((i % 50000000) == 0)  cout << ".";
 	}
